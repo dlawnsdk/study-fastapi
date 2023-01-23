@@ -1,14 +1,13 @@
-from typing import Optional, Union
+from typing import Optional
 from enum import Enum
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Query, Path, Body
+from pydantic import BaseModel, Required
 
 app = FastAPI()
 
 class Item(BaseModel):
     name: str
     price: float
-    is_offer: Union[bool, None] = None
 
 class ModelName(str, Enum):
     alexnet = "alexnet2"
@@ -64,3 +63,103 @@ fake_item_db = [{"name": "juna", "age":29, "hobby":"study"}, {"name": "subin", "
 async def read_list(skip: int = 0, limit: int = 1):
     return fake_item_db[skip: skip + limit]
 
+class Item2(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+@app.post("/items2/")
+async def create_item(item: Item2):
+    item_dict = item.dict() # dictionary Type으로 변환
+    if item.tax:
+        price_width_tax = item.price + item.tax
+        item_dict.update({"price_width_tax": price_width_tax})
+    return item_dict
+
+@app.put("/items2/{item_id}")
+async def create_item(item_id: int, item: Item2):
+    item.name = "imjuna"
+    return {"item_id": item_id, **item.dict()}
+
+@app.put("/items3/{item_id}")
+async def create_item(item_id: int, item: Item2, q: str | None = None):
+    result = {"item_id": item_id, **item.dict()}
+    if q:
+        result.update({"q": q})
+    return result
+
+@app.get("/items3/")
+async  def read_items(q: str | None = None):
+    results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
+    if q:
+        results.update({"q": q})
+    return  results
+
+@app.get("/items4/")
+async def read_items(q: str | None  = Query(default=None, min_length=10 ,max_length=50, regex="(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/")):
+    results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
+    if q:
+        results.update({"q":q})
+    return results
+
+@app.get("/items5/")
+async def read_items(q: str = Query(default="Default Data Allowed", min_length=3)):
+    results = {"items": [{"item_id": "001"}, {"item_id": "002"}]}
+    if q:
+        results.update({"q": q})
+    return results
+
+@app.get("/item6/")
+async def read_items(q: str = Query(default=..., min_length=3)): # default=Required
+    results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
+    if q:
+        results.update({"q": q})
+    return results
+
+@app.get("/items7/")
+async def read_items(q: list[str] | None = Query(default=None, title="Query String", description="Testing", alias="Item Alias")):
+    query_items = {"q" : q}
+    return query_items
+
+@app.get("/items8/{item_id}")
+async def read_items(item_id: int = Path(title = "The Id of the item to get"), q: str | None = Query(default=Required, alias="Item-query")):
+    results = {"item_id": item_id}
+    if q:
+        results.update({"q":q})
+    return results
+
+# gt: 크거나(greater than)
+# ge: 크거나 같은(greater than or equal)
+# lt: 작거나(less than)
+# le: 작거나 같은(less than or equal)
+@app.get("/items9/{item_id}")
+async def read_times(*, item_id: int = Path(title = "Id title~", gt=10, le=100), q: str):
+    results = {"item_id": item_id}
+    if q:
+        results.update({"q": q})
+    return results
+
+@app.put("/items10/{item_id}")
+async def update_item(*, item_id: int = Path(title="The Id of the item to get", ge=0, le=1000), q:str | None = None, item: Item2 | None = None,):
+    results = {"item_id": item_id}
+    item.name = "imjuna"
+    if q:
+        results.update({"q": q})
+    if item:
+        results.update({"item": item})
+    return results
+
+class User(BaseModel):
+    username: str
+    full_name: str | None = None
+@app.put("/item11/{item_id}")
+async def update_item(item_id: int, item:Item, user:User):
+    results = {"item_id": item_id, "item":item, "user": user}
+    return results
+
+@app.put("/items12/{item_id}")
+async def update_item(item_id:int, item:Item2, user:User, importance:int = Body()):
+    importance = 5
+    results = {"item_id": item_id, "item": item, "user":user, "importance": importance}
+    return results
